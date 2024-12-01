@@ -149,7 +149,7 @@ function TaskList() {
   }
 
   return (
-    <table className="font-mono">
+    <table className="font-mono w-full">
       <thead>
         <TitleRow />
       </thead>
@@ -190,14 +190,10 @@ function CountsRow(counts: CountItem[]) {
 
 function TaskRow(task: Task, index: number, mutateBucket: any) {
   return (
-    <tr key={task.id} className={`${index % 2 == 0 ? "bg-slate-100" : ""}`}>
+    <tr key={task.id} className={`${index % 2 == 0 ? "bg-slate-800" : ""}`}>
       <td>
         {" "}
-        <a
-          href={task.link}
-          target="_blank"
-          className="text-slate-900 hover:text-blue-800"
-        >
+        <a href={task.link} target="_blank" className=" hover:text-blue-200">
           {task.title}
         </a>
       </td>
@@ -221,7 +217,7 @@ function MoveTaskButton(task: Task, newBucket: string, mutateBucket: any) {
 
   return (
     <button
-      className="text-slate-500 rounded-full cursor-pointer px-2 hover:bg-slate-200 hover:duration-200 duration-500"
+      className="text-slate-500 rounded-full cursor-pointer px-2 hover:text-slate-800 hover:bg-slate-600 hover:duration-200 duration-500"
       onClick={onClick}
     >
       ✗
@@ -230,7 +226,7 @@ function MoveTaskButton(task: Task, newBucket: string, mutateBucket: any) {
 }
 
 async function fetchTaskList() {
-  const data = await pb.collection("tasks").getList<Task>(1, 10, {
+  const data = await pb.collection("tasks").getList<Task>(1, 30, {
     filter: `group = '${currentGroup}'`,
   });
   return data.items;
@@ -432,7 +428,14 @@ function Login() {
   }
 
   if (user.user) {
-    return <button onClick={onLogout}>Logout {user.user.name}</button>;
+    return (
+      <button
+        onClick={onLogout}
+        className="hover:border-slate-200 border-2 border-transparent duration-200 rounded-xl px-2 cursor-pointer"
+      >
+        Logout {user.user.name}
+      </button>
+    );
   }
 
   return (
@@ -440,14 +443,16 @@ function Login() {
       <input
         placeholder="email"
         onChange={(e) => setEmail(e.target.value)}
+        className="m-2"
       ></input>
       <input
         placeholder="password"
         type="password"
         onChange={(e) => setPassword(e.target.value)}
+        className="m-2 bg-black"
       ></input>
       <button
-        className="bg-slate-200 p-2 rounded-xl cursor-pointer"
+        className="hover:border-slate-200 border-2 border-transparent duration-200 rounded-xl px-2 cursor-pointer"
         onClick={onLogin}
       >
         Login
