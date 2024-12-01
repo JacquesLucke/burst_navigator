@@ -1,5 +1,3 @@
-"use client";
-
 import PocketBase from "pocketbase";
 import { AuthRecord } from "pocketbase";
 import { useState, createContext, useContext } from "react";
@@ -72,6 +70,8 @@ export default function Page() {
 }
 
 function TaskList() {
+  const user = useUser();
+
   const {
     data: tasks,
     isLoading: tasksLoading,
@@ -155,7 +155,9 @@ function TaskList() {
       </thead>
       <tbody>
         {CountsRow(counts!)}
-        {tasks!.map((task, index) => TaskRow(task, index, mutateBucket))}
+        {tasks!.map((task, index) =>
+          TaskRow(task, index, mutateBucket, user.user)
+        )}
       </tbody>
     </table>
   );
@@ -188,7 +190,12 @@ function CountsRow(counts: CountItem[]) {
   );
 }
 
-function TaskRow(task: Task, index: number, mutateBucket: any) {
+function TaskRow(
+  task: Task,
+  index: number,
+  mutateBucket: any,
+  user: AuthRecord
+) {
   return (
     <tr key={task.id} className={`${index % 2 == 0 ? "bg-slate-800" : ""}`}>
       <td>
@@ -202,7 +209,7 @@ function TaskRow(task: Task, index: number, mutateBucket: any) {
           {task.bucket == bucketDefinition.bucket_id ? (
             <span className="text-green-500">✓</span>
           ) : (
-            MoveTaskButton(task, bucketDefinition.bucket_id, mutateBucket)
+            MoveTaskButton(task, bucketDefinition.bucket_id, mutateBucket, user)
           )}
         </td>
       ))}
@@ -210,15 +217,24 @@ function TaskRow(task: Task, index: number, mutateBucket: any) {
   );
 }
 
-function MoveTaskButton(task: Task, newBucket: string, mutateBucket: any) {
+function MoveTaskButton(
+  task: Task,
+  newBucket: string,
+  mutateBucket: any,
+  user: AuthRecord
+) {
   function onClick() {
     mutateBucket.mutate({ task, newBucket });
   }
+  const isLoggedIn = user || false;
 
   return (
     <button
-      className="text-slate-500 rounded-full cursor-pointer px-2 hover:text-slate-800 hover:bg-slate-600 hover:duration-200 duration-500"
+      className={`text-slate-500 rounded-full px-2 hover:text-slate-800 hover:bg-slate-600 hover:duration-200 duration-500 ${
+        isLoggedIn ? "cursor-pointer " : "cursor-not-allowed"
+      }`}
       onClick={onClick}
+      disabled={!isLoggedIn}
     >
       ✗
     </button>
