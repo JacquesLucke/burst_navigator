@@ -16,16 +16,6 @@ type UserContextType = {
   userUpdated: () => void;
 };
 
-const UserContext = createContext<UserContextType | undefined>(undefined);
-
-function useUser() {
-  const context = useContext(UserContext);
-  if (context === undefined) {
-    throw new Error("useUser must be used within a UserContext.Provider");
-  }
-  return context;
-}
-
 interface Task {
   id: string;
   title: string;
@@ -39,6 +29,22 @@ type BucketDefinition = {
   bucket_id: string;
 };
 
+interface CountItem {
+  group: string;
+  bucket: string;
+  total: number;
+}
+
+const UserContext = createContext<UserContextType | undefined>(undefined);
+
+function useUser() {
+  const context = useContext(UserContext);
+  if (context === undefined) {
+    throw new Error("useUser must be used within a UserContext.Provider");
+  }
+  return context;
+}
+
 const currentGroup = "Nodes & Physics";
 let currentBucketID = localStorage.getItem("currentBucketID") || "";
 
@@ -51,12 +57,6 @@ const bucketDefinitions: BucketDefinition[] = [
   { name: "Docs", bucket_id: "docs" },
   { name: "Done", bucket_id: "done" },
 ];
-
-function updateCurrentBucketID(bucketID: string) {
-  currentBucketID = bucketID;
-  queryClient.invalidateQueries("tasks");
-  localStorage.setItem("currentBucketID", bucketID);
-}
 
 export default function Page() {
   const [dummy, setDummy] = useState(0);
@@ -284,12 +284,6 @@ async function fetchTaskList() {
   return data.items;
 }
 
-interface CountItem {
-  group: string;
-  bucket: string;
-  total: number;
-}
-
 async function fetchCounts() {
   const data = await pb.collection("counts").getFullList<CountItem>({
     filter: `group = '${currentGroup}'`,
@@ -387,4 +381,10 @@ function GetTasksRow() {
       ))}
     </tr>
   );
+}
+
+function updateCurrentBucketID(bucketID: string) {
+  currentBucketID = bucketID;
+  queryClient.invalidateQueries("tasks");
+  localStorage.setItem("currentBucketID", bucketID);
 }
