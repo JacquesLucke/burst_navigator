@@ -107,17 +107,11 @@ function TaskList() {
       onMutate: async ({ task, newBucket }) => {
         await queryClient.cancelQueries("tasks");
 
-        const previous_tasks = queryClient.getQueryData<Task[]>("tasks") || [];
-        const updated_tasks = previous_tasks.map((task_) =>
-          task_.id === task.id ? { ...task_, bucket: newBucket } : task_
-        );
-        queryClient.setQueryData<Task[]>("tasks", updated_tasks);
-
         const previous_counts =
           queryClient.getQueryData<CountItem[]>("counts") || [];
         let updated_counts = previous_counts;
         // Reduce old count.
-        updated_counts = previous_counts.map((count_) =>
+        updated_counts = updated_counts.map((count_) =>
           count_.bucket === task.bucket
             ? { ...count_, total: count_.total - 1 }
             : count_
@@ -129,6 +123,12 @@ function TaskList() {
             : count_
         );
         queryClient.setQueryData<CountItem[]>("counts", updated_counts);
+
+        const previous_tasks = queryClient.getQueryData<Task[]>("tasks") || [];
+        const updated_tasks = previous_tasks.map((task_) =>
+          task_.id === task.id ? { ...task_, bucket: newBucket } : task_
+        );
+        queryClient.setQueryData<Task[]>("tasks", updated_tasks);
 
         return { previous_tasks, previous_counts };
       },
