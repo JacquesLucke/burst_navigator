@@ -40,6 +40,7 @@ type BucketDefinition = {
 };
 
 const currentGroup = "Nodes & Physics";
+let currentBucketID = localStorage.getItem("currentBucketID") || "";
 
 const bucketDefinitions: BucketDefinition[] = [
   { name: "Uncategorized", bucket_id: "" },
@@ -51,6 +52,12 @@ const bucketDefinitions: BucketDefinition[] = [
   { name: "Done", bucket_id: "done" },
 ];
 
+function updateCurrentBucketID(bucketID: string) {
+  currentBucketID = bucketID;
+  queryClient.invalidateQueries("tasks");
+  localStorage.setItem("currentBucketID", bucketID);
+}
+
 export default function Page() {
   const [dummy, setDummy] = useState(0);
 
@@ -59,7 +66,11 @@ export default function Page() {
       <UserContext.Provider
         value={{
           user: pb.authStore.record,
-          userUpdated: () => setDummy(dummy + 1),
+          userUpdated: () => {
+            setDummy(dummy + 1);
+            queryClient.invalidateQueries("tasks");
+            queryClient.invalidateQueries("counts");
+          },
         }}
       >
         <Login />
@@ -165,11 +176,21 @@ function TaskList() {
 }
 
 function TitleRow() {
+  function onClick(bucket_id: string) {
+    updateCurrentBucketID(bucket_id);
+  }
+
   return (
     <tr>
       <th>Title</th>
       {bucketDefinitions.map((bucketDefinition) => (
-        <th key={bucketDefinition.bucket_id} className="px-2">
+        <th
+          key={bucketDefinition.bucket_id}
+          className={`px-2 rounded-full cursor-pointer ${
+            bucketDefinition.bucket_id == currentBucketID ? "bg-slate-700" : ""
+          }`}
+          onClick={() => onClick(bucketDefinition.bucket_id)}
+        >
           {bucketDefinition.name}
         </th>
       ))}
@@ -197,15 +218,20 @@ function TaskRow(
   mutateBucket: any,
   user: AuthRecord
 ) {
+  const finished = task.bucket !== currentBucketID;
+
   return (
-    <tr key={task.id} className={`${index % 2 === 0 ? "bg-slate-800" : ""}`}>
-      <td>
+    <tr
+      key={task.id}
+      className={`${index % 2 === 0 ? "bg-slate-800" : ""} hover:bg-slate-700`}
+    >
+      <td className="p-1">
         {" "}
         <a
           href={task.link}
           rel="noreferrer"
           target="_blank"
-          className="hover:text-blue-200"
+          className={`hover:text-blue-200 ${finished ? "text-slate-600" : ""} `}
         >
           {task.title}
         </a>
@@ -248,8 +274,12 @@ function MoveTaskButton(
 }
 
 async function fetchTaskList() {
+  let filter = "";
+  if (pb.authStore.record) {
+    filter += `group = '${currentGroup}' && assigned = '${pb.authStore.record.id}'`;
+  }
   const data = await pb.collection("tasks").getList<Task>(1, 30, {
-    filter: `group = '${currentGroup}'`,
+    filter,
   });
   return data.items;
 }
@@ -322,6 +352,20 @@ function GetTasksRow() {
   const isLoggedIn = !!user.user || false;
 
   async function onClick(bucket_id: string) {
+    const url = pb.baseURL + "/get_new_tasks";
+    await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: pb.authStore.token,
+      },
+      body: JSON.stringify({
+        group: currentGroup,
+        bucket_id,
+      }),
+    });
+
+    updateCurrentBucketID(bucket_id);
     queryClient.invalidateQueries("tasks");
   }
 
@@ -335,6 +379,7 @@ function GetTasksRow() {
               isLoggedIn ? "cursor-pointer " : "cursor-not-allowed"
             }`}
             onClick={() => onClick(bucketDefinition.bucket_id)}
+            disabled={!isLoggedIn}
           >
             Load
           </button>
