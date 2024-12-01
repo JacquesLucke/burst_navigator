@@ -64,7 +64,7 @@ export default function Page() {
           userUpdated: () => setDummy(dummy + 1),
         }}
       >
-        <BucketsBar />
+        <Login />
         <TaskList />
       </UserContext.Provider>
     </QueryClientProvider>
@@ -72,20 +72,160 @@ export default function Page() {
 }
 
 function TaskList() {
-  const { data: tasks, isLoading, isError } = useQuery("tasks", fetchTaskList);
+  const {
+    data: tasks,
+    isLoading: tasksLoading,
+    isError: tasksError,
+  } = useQuery("tasks", fetchTaskList);
+  const {
+    data: counts,
+    isLoading: countsLoading,
+    isError: countsError,
+  } = useQuery("counts", fetchCounts);
 
-  if (isLoading) {
+  const mutateBucket = useMutation<
+    unknown,
+    unknown,
+    { task: Task; newBucket: string },
+    { previous_tasks: Task[]; previous_counts: CountItem[] }
+  >(
+    async ({ task, newBucket }) => {
+      await pb.collection("tasks").update(task.id, { bucket: newBucket });
+    },
+    {
+      onMutate: async ({ task, newBucket }) => {
+        await queryClient.cancelQueries("tasks");
+
+        const previous_tasks = queryClient.getQueryData<Task[]>("tasks") || [];
+        const updated_tasks = previous_tasks.map((task_) =>
+          task_.id == task.id ? { ...task_, bucket: newBucket } : task_
+        );
+        queryClient.setQueryData<Task[]>("tasks", updated_tasks);
+
+        const previous_counts =
+          queryClient.getQueryData<CountItem[]>("counts") || [];
+        let updated_counts = previous_counts;
+        // Reduce old count.
+        updated_counts = previous_counts.map((count_) =>
+          count_.bucket == task.bucket
+            ? { ...count_, total: count_.total - 1 }
+            : count_
+        );
+        // Increase new count.
+        updated_counts = previous_counts.map((count_) =>
+          count_.bucket == newBucket
+            ? { ...count_, total: count_.total + 1 }
+            : count_
+        );
+        queryClient.setQueryData<CountItem[]>("counts", updated_counts);
+
+        return { previous_tasks, previous_counts };
+      },
+      onError: (err, variables, context) => {
+        if (context) {
+          if (context.previous_tasks) {
+            queryClient.setQueryData<Task[]>("tasks", context.previous_tasks);
+          }
+          if (context.previous_counts) {
+            queryClient.setQueryData<CountItem[]>(
+              "counts",
+              context.previous_counts
+            );
+          }
+        }
+      },
+      onSettled: () => {
+        queryClient.invalidateQueries("tasks");
+        queryClient.invalidateQueries("counts");
+      },
+    }
+  );
+
+  if (tasksLoading || countsLoading) {
     return <p>Loading...</p>;
   }
-  if (isError) {
+  if (tasksError || countsError) {
     return <p>Error</p>;
   }
 
   return (
-    <div>
-      <Login />
-      <ul>{tasks!.map((task) => TaskItem(task))}</ul>
-    </div>
+    <table className="font-mono">
+      <thead>
+        <TitleRow />
+      </thead>
+      <tbody>
+        {CountsRow(counts!)}
+        {tasks!.map((task, index) => TaskRow(task, index, mutateBucket))}
+      </tbody>
+    </table>
+  );
+}
+
+function TitleRow() {
+  return (
+    <tr>
+      <th>Title</th>
+      {bucketDefinitions.map((bucketDefinition) => (
+        <th key={bucketDefinition.bucket_id} className="px-2">
+          {bucketDefinition.name}
+        </th>
+      ))}
+    </tr>
+  );
+}
+
+function CountsRow(counts: CountItem[]) {
+  return (
+    <tr>
+      <td></td>
+      {bucketDefinitions.map((bucketDefinition) => (
+        <td key={bucketDefinition.bucket_id} className="px-2 text-center">
+          {counts.find((count) => count.bucket == bucketDefinition.bucket_id)
+            ?.total || 0}
+        </td>
+      ))}
+    </tr>
+  );
+}
+
+function TaskRow(task: Task, index: number, mutateBucket: any) {
+  return (
+    <tr key={task.id} className={`${index % 2 == 0 ? "bg-slate-100" : ""}`}>
+      <td>
+        {" "}
+        <a
+          href={task.link}
+          target="_blank"
+          className="text-slate-900 hover:text-blue-800"
+        >
+          {task.title}
+        </a>
+      </td>
+      {bucketDefinitions.map((bucketDefinition) => (
+        <td key={bucketDefinition.bucket_id} className="text-center">
+          {task.bucket == bucketDefinition.bucket_id ? (
+            <span className="text-green-500">✓</span>
+          ) : (
+            MoveTaskButton(task, bucketDefinition.bucket_id, mutateBucket)
+          )}
+        </td>
+      ))}
+    </tr>
+  );
+}
+
+function MoveTaskButton(task: Task, newBucket: string, mutateBucket: any) {
+  function onClick() {
+    mutateBucket.mutate({ task, newBucket });
+  }
+
+  return (
+    <button
+      className="text-slate-500 rounded-full cursor-pointer px-2 hover:bg-slate-200 hover:duration-200 duration-500"
+      onClick={onClick}
+    >
+      ✗
+    </button>
   );
 }
 
