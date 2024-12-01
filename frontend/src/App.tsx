@@ -52,7 +52,7 @@ let currentBucketID = localStorage.getItem("currentBucketID") || "";
 
 const bucketDefinitions: BucketDefinition[] = [
   { name: "Uncategorized", bucket_id: "" },
-  { name: "End of Live", bucket_id: "eol" },
+  { name: "End of Life", bucket_id: "eol" },
   { name: "Active", bucket_id: "active" },
   { name: "Inactive", bucket_id: "inactive" },
   { name: "Other", bucket_id: "other" },
