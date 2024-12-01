@@ -323,7 +323,7 @@ function Login() {
       <input
         placeholder="email"
         onChange={(e) => setEmail(e.target.value)}
-        className="m-2"
+        className="m-2 bg-black"
       ></input>
       <input
         placeholder="password"
