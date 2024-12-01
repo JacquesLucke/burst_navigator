@@ -36,6 +36,23 @@ interface Task {
   group: string;
 }
 
+type BucketDefinition = {
+  name: string;
+  bucket_id: string;
+};
+
+const currentGroup = "Nodes & Physics";
+
+const bucketDefinitions: BucketDefinition[] = [
+  { name: "Uncategorized", bucket_id: "" },
+  { name: "End of Live", bucket_id: "eol" },
+  { name: "Active", bucket_id: "active" },
+  { name: "Inactive", bucket_id: "inactive" },
+  { name: "Other", bucket_id: "other" },
+  { name: "Docs", bucket_id: "docs" },
+  { name: "Done", bucket_id: "done" },
+];
+
 export default function Page() {
   const [dummy, setDummy] = useState(0);
 
@@ -47,6 +64,7 @@ export default function Page() {
           userUpdated: () => setDummy(dummy + 1),
         }}
       >
+        <BucketsBar />
         <TaskList />
       </UserContext.Provider>
     </QueryClientProvider>
@@ -73,19 +91,58 @@ function TaskList() {
 
 async function fetchTaskList() {
   const data = await pb.collection("tasks").getList<Task>(1, 10, {
-    filter: "group = 'Nodes & Physics'",
+    filter: `group = '${currentGroup}'`,
   });
   return data.items;
 }
 
+interface CountItem {
+  group: string;
+  bucket: string;
+  total: number;
+}
+
+async function fetchCounts() {
+  const data = await pb.collection("counts").getFullList<CountItem>({
+    filter: `group = '${currentGroup}'`,
+  });
+  return data;
+}
+
+function BucketsBar() {
+  const { data: counts, isLoading, isError } = useQuery("counts", fetchCounts);
+
+  if (isLoading) {
+    return <p></p>;
+  }
+  if (isError || counts === undefined) {
+    return <p>Error</p>;
+  }
+
+  return (
+    <div>
+      {bucketDefinitions.map((bucketDefinition) =>
+        BucketItem(bucketDefinition, counts)
+      )}
+    </div>
+  );
+}
+
+function BucketItem(bucketDefinition: BucketDefinition, counts: CountItem[]) {
+  const count =
+    counts.find((count) => count.bucket == bucketDefinition.bucket_id)?.total ||
+    0;
+
+  return (
+    <div key={bucketDefinition.bucket_id}>
+      {bucketDefinition.name}: <span>{count}</span>
+    </div>
+  );
+}
+
 function TaskItem(task: Task) {
   return (
-    <li
-      key={task.id}
-      className={`p-2  m-2 rounded-md ${
-        task.bucket == "done" ? "bg-red-300" : "bg-slate-100"
-      } `}
-    >
+    <li key={task.id} className={`p-2  m-2 rounded-md "bg-slate-100"`}>
       <a
         href={task.link}
         target="_blank"
@@ -141,7 +198,7 @@ function SetBucketButton({
     unknown,
     unknown,
     unknown,
-    { previous_tasks: Task[] }
+    { previous_tasks: Task[]; previous_counts: CountItem[] }
   >(
     async () => {
       await pb.collection("tasks").update(task.id, { bucket: newBucket });
@@ -156,17 +213,41 @@ function SetBucketButton({
         );
         queryClient.setQueryData<Task[]>("tasks", updated_tasks);
 
-        return { previous_tasks };
+        const previous_counts =
+          queryClient.getQueryData<CountItem[]>("counts") || [];
+        let updated_counts = previous_counts;
+        // Reduce old count.
+        updated_counts = previous_counts.map((count_) =>
+          count_.bucket == task.bucket
+            ? { ...count_, total: count_.total - 1 }
+            : count_
+        );
+        // Increase new count.
+        updated_counts = previous_counts.map((count_) =>
+          count_.bucket == newBucket
+            ? { ...count_, total: count_.total + 1 }
+            : count_
+        );
+        queryClient.setQueryData<CountItem[]>("counts", updated_counts);
+
+        return { previous_tasks, previous_counts };
       },
       onError: (err, variables, context) => {
         if (context) {
           if (context.previous_tasks) {
             queryClient.setQueryData<Task[]>("tasks", context.previous_tasks);
           }
+          if (context.previous_counts) {
+            queryClient.setQueryData<CountItem[]>(
+              "counts",
+              context.previous_counts
+            );
+          }
         }
       },
       onSettled: () => {
         queryClient.invalidateQueries("tasks");
+        queryClient.invalidateQueries("counts");
       },
     }
   );
