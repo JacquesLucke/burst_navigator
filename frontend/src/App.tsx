@@ -8,7 +8,9 @@ import {
   useQuery,
 } from "react-query";
 
-const pb = new PocketBase("http://127.0.0.1:8090");
+// const server = "http://127.0.0.1:8090";
+const server = "https://burst-navigator.jlucke.com";
+const pb = new PocketBase(server);
 const queryClient = new QueryClient();
 
 type UserContextType = {
