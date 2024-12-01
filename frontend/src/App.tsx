@@ -123,7 +123,7 @@ function TaskList() {
             : count_
         );
         // Increase new count.
-        updated_counts = previous_counts.map((count_) =>
+        updated_counts = updated_counts.map((count_) =>
           count_.bucket === newBucket
             ? { ...count_, total: count_.total + 1 }
             : count_
